@@ -1,6 +1,7 @@
 <script>
-  export let data;
-  console.log(data.items);
+  //export let data;
 </script>
 
-<h1>Hello from louigggg</h1>
+<svelte:head>
+  <title>Bienvenue chez Louigggg</title>
+</svelte:head>
