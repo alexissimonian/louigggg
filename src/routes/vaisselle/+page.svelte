@@ -10,6 +10,7 @@
   let targetVirtualScroll = 0; // Target for smooth interpolation
   const FLIP_DURATION = 800; // Scroll amount needed to complete flip
   const LERP_FACTOR = 0.15; // Smoothing factor (lower = smoother but slower)
+  let animationFrameId: number;
 
   onMount(() => {
     // Scene setup
@@ -108,18 +109,25 @@
 
     window.addEventListener("wheel", handleWheel, { passive: false });
 
-    // Handle resize
+    // Handle resize with debounce to avoid rapid texture recreation
+    let resizeTimeout: ReturnType<typeof setTimeout>;
     const handleResize = () => {
-      camera.aspect = canvas.clientWidth / canvas.clientHeight;
-      camera.updateProjectionMatrix();
-      renderer.setSize(canvas.clientWidth, canvas.clientHeight);
+      clearTimeout(resizeTimeout);
+      resizeTimeout = setTimeout(() => {
+        camera.aspect = canvas.clientWidth / canvas.clientHeight;
+        camera.updateProjectionMatrix();
+        renderer.setSize(canvas.clientWidth, canvas.clientHeight, false);
+      }, 100);
     };
 
     window.addEventListener("resize", handleResize);
 
     // Animation loop
+    let isRunning = true;
     function animate() {
-      requestAnimationFrame(animate);
+      if (!isRunning) return;
+
+      animationFrameId = requestAnimationFrame(animate);
 
       // Smooth interpolation (lerp) between current and target
       virtualScroll += (targetVirtualScroll - virtualScroll) * LERP_FACTOR;
@@ -139,10 +147,52 @@
 
     // Cleanup
     return () => {
+      // Stop animation loop
+      isRunning = false;
+      if (animationFrameId) {
+        cancelAnimationFrame(animationFrameId);
+      }
+
+      // Remove event listeners
       window.removeEventListener("wheel", handleWheel);
       window.removeEventListener("resize", handleResize);
-      document.body.style.overflow = "auto";
+      clearTimeout(resizeTimeout);
+
+      // Dispose of Three.js resources
+      if (model) {
+        model.traverse((child) => {
+          if (child instanceof THREE.Mesh) {
+            if (child.geometry) {
+              child.geometry.dispose();
+            }
+            if (child.material) {
+              if (Array.isArray(child.material)) {
+                child.material.forEach((material) => {
+                  if (material.map) material.map.dispose();
+                  if (material.normalMap) material.normalMap.dispose();
+                  if (material.roughnessMap) material.roughnessMap.dispose();
+                  if (material.metalnessMap) material.metalnessMap.dispose();
+                  material.dispose();
+                });
+              } else {
+                if (child.material.map) child.material.map.dispose();
+                if (child.material.normalMap) child.material.normalMap.dispose();
+                if (child.material.roughnessMap) child.material.roughnessMap.dispose();
+                if (child.material.metalnessMap) child.material.metalnessMap.dispose();
+                child.material.dispose();
+              }
+            }
+          }
+        });
+        scene.remove(model);
+      }
+
+      // Dispose renderer and scene
       renderer.dispose();
+      renderer.forceContextLoss();
+      scene.clear();
+
+      document.body.style.overflow = "auto";
     };
   });
 </script>
