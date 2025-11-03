@@ -1,7 +1,10 @@
-import { getAllItems } from "$lib/services/items";
+import { getAllDishes } from "$lib/services/items";
+
 export async function load() {
-  //let data = await getAllItems();
+  let dishes = await getAllDishes();
+  let products = [];
+  products.push({ name: "vaisselle", list: dishes })
   return {
-    //items: data
+    products: products,
   }
 }
